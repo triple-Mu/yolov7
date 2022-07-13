@@ -32,11 +32,6 @@ def export_onnx(model, im, file, opset, simplify, end2end):
         model_onnx = onnx.load(f)  # load onnx model
         onnx.checker.check_model(model_onnx)  # check onnx model
 
-        # Metadata
-        d = {'stride': int(max(model.stride)), 'names': model.names}
-        for k, v in d.items():
-            meta = model_onnx.metadata_props.add()
-            meta.key, meta.value = k, str(v)
         onnx.save(model_onnx, f)
 
         # Simplify
@@ -109,7 +104,7 @@ def run(
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='yolov5s.pt', help='model.pt path(s)')
+    parser.add_argument('--weights', type=str, default='yolov7.pt', help='model.pt path(s)')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640, 640], help='image (h, w)')
     parser.add_argument('--batch-size', type=int, default=1, help='batch size')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
