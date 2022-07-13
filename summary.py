@@ -37,6 +37,7 @@ class Conv(nn.Module):
     def forward_fuse(self, x):
         return self.act(self.conv(x))
 
+
 class DWConv(Conv):
     # Depth-wise convolution class
     def __init__(self, c1, c2, k=1, s=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
@@ -227,6 +228,7 @@ class RepConv(nn.Module):
             del self.rbr_dense
             self.rbr_dense = None
 
+
 class Detect(nn.Module):
     stride = None  # strides computed during build
     onnx_dynamic = False  # ONNX export parameter
@@ -336,6 +338,7 @@ class IDetect(nn.Module):
         else:
             yv, xv = torch.meshgrid(torch.arange(ny), torch.arange(nx))
         return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
+
 
 class Model(nn.Module):
     # YOLOv5 model
@@ -485,6 +488,7 @@ class Model(nn.Module):
                 m.anchor_grid = list(map(fn, m.anchor_grid))
         return self
 
+
 class ImplicitA(nn.Module):
     def __init__(self, channel):
         super(ImplicitA, self).__init__()
@@ -505,6 +509,7 @@ class ImplicitM(nn.Module):
 
     def forward(self, x):
         return self.implicit * x
+
 
 class MixConv2d(nn.Module):
     # Mixed Depth-wise Conv https://arxiv.org/abs/1907.09595
@@ -530,6 +535,7 @@ class MixConv2d(nn.Module):
     def forward(self, x):
         return self.act(self.bn(torch.cat([m(x) for m in self.m], 1)))
 
+
 class Sum(nn.Module):
     # Weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
     def __init__(self, n, weight=False):  # n: number of inputs
@@ -550,6 +556,7 @@ class Sum(nn.Module):
                 y = y + x[i + 1]
         return y
 
+
 class GhostConv(nn.Module):
     # Ghost Convolution https://github.com/huawei-noah/ghostnet
     def __init__(self, c1, c2, k=1, s=1, g=1, act=True):  # ch_in, ch_out, kernel, stride, groups
@@ -562,6 +569,7 @@ class GhostConv(nn.Module):
         y = self.cv1(x)
         return torch.cat((y, self.cv2(y)), 1)
 
+
 class Bottleneck(nn.Module):
     # Standard bottleneck
     def __init__(self, c1, c2, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, shortcut, groups, expansion
@@ -573,6 +581,7 @@ class Bottleneck(nn.Module):
 
     def forward(self, x):
         return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
+
 
 class GhostBottleneck(nn.Module):
     # Ghost Bottleneck https://github.com/huawei-noah/ghostnet
@@ -589,6 +598,7 @@ class GhostBottleneck(nn.Module):
     def forward(self, x):
         return self.conv(x) + self.shortcut(x)
 
+
 class SPP(nn.Module):
     # Spatial Pyramid Pooling (SPP) layer https://arxiv.org/abs/1406.4729
     def __init__(self, c1, c2, k=(5, 9, 13)):
@@ -603,6 +613,7 @@ class SPP(nn.Module):
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')  # suppress torch 1.9.0 max_pool2d() warning
             return self.cv2(torch.cat([x] + [m(x) for m in self.m], 1))
+
 
 class SPPF(nn.Module):
     # Spatial Pyramid Pooling - Fast (SPPF) layer for YOLOv5 by Glenn Jocher
@@ -620,6 +631,7 @@ class SPPF(nn.Module):
             y1 = self.m(x)
             y2 = self.m(y1)
             return self.cv2(torch.cat((x, y1, y2, self.m(y2)), 1))
+
 
 class SPPCSPC(nn.Module):
     def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5, k=(5, 9, 13)):
@@ -640,6 +652,7 @@ class SPPCSPC(nn.Module):
         y2 = self.cv2(x)
         return self.cv7(torch.cat((y1, y2), dim=1))
 
+
 class Focus(nn.Module):
     # Focus wh information into c-space
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
@@ -650,6 +663,7 @@ class Focus(nn.Module):
     def forward(self, x):  # x(b,c,w,h) -> y(b,4c,w/2,h/2)
         return self.conv(torch.cat((x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]), 1))
         # return self.conv(self.contract(x))
+
 
 class CrossConv(nn.Module):
     # Cross Convolution Downsample
@@ -663,6 +677,7 @@ class CrossConv(nn.Module):
 
     def forward(self, x):
         return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
+
 
 class BottleneckCSP(nn.Module):
     # CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
@@ -682,6 +697,7 @@ class BottleneckCSP(nn.Module):
         y2 = self.cv2(x)
         return self.cv4(self.act(self.bn(torch.cat((y1, y2), 1))))
 
+
 class C3(nn.Module):
     # CSP Bottleneck with 3 convolutions
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
@@ -694,6 +710,7 @@ class C3(nn.Module):
 
     def forward(self, x):
         return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), 1))
+
 
 class C3TR(C3):
     # C3 module with TransformerBlock()
@@ -721,6 +738,7 @@ class TransformerBlock(nn.Module):
         p = x.flatten(2).permute(2, 0, 1)
         return self.tr(p + self.linear(p)).permute(1, 2, 0).reshape(b, self.c2, w, h)
 
+
 class TransformerLayer(nn.Module):
     # Transformer layer https://arxiv.org/abs/2010.11929 (LayerNorm layers removed for better performance)
     def __init__(self, c, num_heads):
@@ -737,12 +755,14 @@ class TransformerLayer(nn.Module):
         x = self.fc2(self.fc1(x)) + x
         return x
 
+
 class C3SPP(C3):
     # C3 module with SPP()
     def __init__(self, c1, c2, k=(5, 9, 13), n=1, shortcut=True, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, g, e)
         c_ = int(c2 * e)
         self.m = SPP(c_, c_, k)
+
 
 class C3Ghost(C3):
     # C3 module with GhostBottleneck()
@@ -751,10 +771,12 @@ class C3Ghost(C3):
         c_ = int(c2 * e)  # hidden channels
         self.m = nn.Sequential(*(GhostBottleneck(c_, c_) for _ in range(n)))
 
+
 class DWConvTranspose2d(nn.ConvTranspose2d):
     # Depth-wise transpose convolution class
     def __init__(self, c1, c2, k=1, s=1, p1=0, p2=0):  # ch_in, ch_out, kernel, stride, padding, padding_out
         super().__init__(c1, c2, k, s, p1, p2, groups=math.gcd(c1, c2))
+
 
 class C3x(C3):
     # C3 module with cross-convolutions
@@ -763,17 +785,19 @@ class C3x(C3):
         c_ = int(c2 * e)
         self.m = nn.Sequential(*(CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)))
 
+
 class DownC(nn.Module):
     def __init__(self, c1, c2, n=1, k=2):
         super(DownC, self).__init__()
         c_ = int(c1)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
-        self.cv2 = Conv(c_, c2//2, 3, k)
-        self.cv3 = Conv(c1, c2//2, 1, 1)
+        self.cv2 = Conv(c_, c2 // 2, 3, k)
+        self.cv3 = Conv(c1, c2 // 2, 1, 1)
         self.mp = nn.MaxPool2d(kernel_size=k, stride=k)
 
     def forward(self, x):
         return torch.cat((self.cv2(self.cv1(x)), self.cv3(self.mp(x))), dim=1)
+
 
 class Shortcut(nn.Module):
     def __init__(self, dimension=0):
@@ -781,8 +805,9 @@ class Shortcut(nn.Module):
         self.d = dimension
 
     def forward(self, x):
-        #print(x)
-        return x[0]+x[1]#torch.sum(torch.stack(x), self.d)
+        # print(x)
+        return x[0] + x[1]  # torch.sum(torch.stack(x), self.d)
+
 
 class ReOrg(nn.Module):
     def __init__(self):
@@ -790,6 +815,7 @@ class ReOrg(nn.Module):
 
     def forward(self, x):  # x(b,c,w,h) -> y(b,4c,w/2,h/2)
         return torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1)
+
 
 class Concat(nn.Module):
     # Concatenate a list of tensors along dimension
@@ -799,6 +825,7 @@ class Concat(nn.Module):
 
     def forward(self, x):
         return torch.cat(x, self.d)
+
 
 class Contract(nn.Module):
     # Contract width-height into channels, i.e. x(1,64,80,80) to x(1,256,40,40)
@@ -813,6 +840,7 @@ class Contract(nn.Module):
         x = x.permute(0, 3, 5, 1, 2, 4).contiguous()  # x(1,2,2,64,40,40)
         return x.view(b, c * s * s, h // s, w // s)  # x(1,256,40,40)
 
+
 class Expand(nn.Module):
     # Expand channels into width-height, i.e. x(1,64,80,80) to x(1,16,160,160)
     def __init__(self, gain=2):
@@ -826,6 +854,7 @@ class Expand(nn.Module):
         x = x.permute(0, 3, 4, 1, 5, 2).contiguous()  # x(1,16,80,2,80,2)
         return x.view(b, c // s ** 2, h * s, w * s)  # x(1,16,160,160)
 
+
 class MP(nn.Module):
     # Spatial pyramid pooling layer used in YOLOv3-SPP
     def __init__(self, k=2):
@@ -835,6 +864,7 @@ class MP(nn.Module):
     def forward(self, x):
         return self.m(x)
 
+
 class SP(nn.Module):
     def __init__(self, k=3, s=1):
         super(SP, self).__init__()
@@ -843,20 +873,22 @@ class SP(nn.Module):
     def forward(self, x):
         return self.m(x)
 
+
 class TRT_NMS(torch.autograd.Function):
     '''TensorRT NMS operation'''
+
     @staticmethod
     def forward(
-        ctx,
-        boxes,
-        scores,
-        background_class=-1,
-        box_coding=1,
-        iou_threshold=0.45,
-        max_output_boxes=100,
-        plugin_version="1",
-        score_activation=0,
-        score_threshold=0.25,
+            ctx,
+            boxes,
+            scores,
+            background_class=-1,
+            box_coding=1,
+            iou_threshold=0.45,
+            max_output_boxes=100,
+            plugin_version="1",
+            score_activation=0,
+            score_threshold=0.25,
     ):
         batch_size, num_boxes, num_classes = scores.shape
         num_det = torch.randint(0, max_output_boxes, (batch_size, 1), dtype=torch.int32)
@@ -890,8 +922,10 @@ class TRT_NMS(torch.autograd.Function):
         nums, boxes, scores, classes = out
         return nums, boxes, scores, classes
 
+
 class ONNX_TRT(nn.Module):
     '''onnx module with TensorRT NMS operation.'''
+
     def __init__(self, max_obj=100, iou_thres=0.45, score_thres=0.25, device=None):
         super().__init__()
         self.device = device if device else torch.device('cpu')
@@ -914,8 +948,10 @@ class ONNX_TRT(nn.Module):
                                                                     self.score_threshold)
         return num_det, det_boxes, det_scores, det_classes
 
+
 class End2End(nn.Module):
     '''export onnx or tensorrt model with NMS operation.'''
+
     def __init__(self, model, max_obj=100, iou_thres=0.45, score_thres=0.25, device=None, with_preprocess=False):
         super().__init__()
         device = device if device else torch.device('cpu')
@@ -926,8 +962,8 @@ class End2End(nn.Module):
 
     def forward(self, x):
         if self.with_preprocess:
-            x = x[:,[2,1,0],...]
-            x = x * (1/255)
+            x = x[:, [2, 1, 0], ...]
+            x = x * (1 / 255)
         x = self.model(x)[0]
         x = self.end2end(x)
         return x
@@ -942,6 +978,7 @@ def check_anchor_order(m):
         print(f'Reversing anchor order')
         m.anchors[:] = m.anchors.flip(0)
 
+
 def initialize_weights(model):
     for m in model.modules():
         t = type(m)
@@ -953,17 +990,20 @@ def initialize_weights(model):
         elif t in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU]:
             m.inplace = True
 
+
 def time_sync():
     # PyTorch-accurate time
     if torch.cuda.is_available():
         torch.cuda.synchronize()
     return time.time()
 
+
 def make_divisible(x, divisor):
     # Returns nearest x divisible by divisor
     if isinstance(divisor, torch.Tensor):
         divisor = int(divisor.max())  # to int
     return math.ceil(x / divisor) * divisor
+
 
 def parse_model(d, ch):  # model_dict, input_channels(3)
     print(f"\n{'':>3}{'from':>18}{'n':>3}{'params':>10}  {'module':<40}{'arguments':<30}")
@@ -1040,6 +1080,7 @@ def autopad(k, p=None):  # kernel, padding
         p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
     return p
 
+
 def fuse_conv_and_bn(conv, bn):
     # Fuse Conv2d() and BatchNorm2d() layers https://tehnokv.com/posts/fusing-batchnorm-and-conv/
     fusedconv = nn.Conv2d(conv.in_channels,
@@ -1075,7 +1116,7 @@ def attempt_load(weights, device=None, inplace=True, fuse=True):
     # Compatibility updates
     for m in model.modules():
         t = type(m)
-        s = re.findall("['](.*)[']",str(t))[0]
+        s = re.findall("['](.*)[']", str(t))[0]
         if 'model' in s or 'summary' in s:
             t = s.split('.')[-1]
             t = eval(t)

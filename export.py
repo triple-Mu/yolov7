@@ -60,7 +60,7 @@ def run(
         simplify=False,  # ONNX: simplify model
         opset=12,  # ONNX: opset version
         end2end=False,  # TRT: add EfficientNMS_TRT to model
-        with_preprocess=False, # TRT: add preprocess to model (BGR2RGB and divide by 255)
+        with_preprocess=False,  # TRT: add preprocess to model (BGR2RGB and divide by 255)
         topk_all=100,  # TRT: topk for every image to keep
         iou_thres=0.45,  # TRT: IoU threshold
         conf_thres=0.25,  # TRT: confidence threshold
