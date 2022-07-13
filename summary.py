@@ -990,13 +990,16 @@ def initialize_weights(model):
         elif t in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU]:
             m.inplace = True
 
-def check(t,m):
+
+def check(t, m):
     s = re.findall("['](.*)[']", str(t))[0]
     if 'model' in s or 'summary' in s:
         t = s.split('.')[-1]
         t = eval(t)
         m.__class__ = t
-    return t,m
+    return t, m
+
+
 def time_sync():
     # PyTorch-accurate time
     if torch.cuda.is_available():
@@ -1121,7 +1124,7 @@ def attempt_load(weights, device=None, inplace=True, fuse=True):
 
     # Compatibility updates
     for m in model.modules():
-        t,m = check(type(m),m)
+        t, m = check(type(m), m)
         if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Model):
             m.inplace = inplace  # torch 1.7.0 compatibility
             if t is Detect and not isinstance(m.anchor_grid, list):
