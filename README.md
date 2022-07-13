@@ -1,3 +1,33 @@
+# End2end TensorRT YOLOv7
+
+这个仓库基于官方的 YOLOv7 并增加了 `summary.py` 和 `export.py` , 将 YOLOv7 网络组建重构便于导出。参考了 YOLOv5 和 YOLOv6 的导出方案。
+
+使用方法与我之前魔改的类似。
+
+``` shell
+# 导出带有 NMS 的 ONNX
+python ./export.py \
+    --weights ./yolov7.pt \
+    --img-size 640 \
+    --batch-size 1 \
+    --device cpu \
+    --opset 12 \
+    --end2end \
+    --topk-all 100 \
+    --iou-thres 0.65 \
+    --conf-thres 0.25
+# 转换 ONNX 为 TensorRT engine
+trtexec --onnx=yolov7.onnx \
+		--saveEngine=yolov7.engine \
+		--fp16 # 如果使用 fp16
+```
+
+剩下的就靠大家玩了！
+
+PS: 目前官方发的几个版本我测试过了，都能成功转 onnx -> tensorrt 后续模型网络结构改了的话就随缘更新吧！
+
+# ↓↓↓ 下面的官方的介绍～～
+
 # Official YOLOv7
 
 Implementation of paper - [YOLOv7: Trainable bag-of-freebies sets new state-of-the-art for real-time object detectors](https://arxiv.org/abs/2207.02696)
