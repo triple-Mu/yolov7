@@ -1,6 +1,6 @@
 # End2end TensorRT YOLOv7
 
-这个仓库基于官方的 YOLOv7 并增加了 `summary.py` 和 `export.py` , 将 YOLOv7 网络组建重构便于导出。参考了 YOLOv5 和 YOLOv6 的导出方案。
+这个仓库基于官方的 YOLOv7 并增加了 `summary.py` 和 `export.py` , 将 YOLOv7 网络组件重构便于导出。参考了 YOLOv5 和 YOLOv6 的导出方案。
 
 使用方法与我之前魔改的类似。
 
