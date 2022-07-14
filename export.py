@@ -5,7 +5,7 @@ import torch
 import warnings
 from pathlib import Path
 
-from summary import (file_size, attempt_load, Detect, End2End)
+from summary import (file_size, attempt_load, Detect, IDetect, End2End)
 
 
 def export_onnx(model, im, file, opset, simplify, end2end):
@@ -82,7 +82,7 @@ def run(
 
     model.eval()
     for k, m in model.named_modules():
-        if isinstance(m, Detect):
+        if isinstance(m, (Detect, IDetect)):
             m.inplace = False
             m.onnx_dynamic = False
             m.export = True
