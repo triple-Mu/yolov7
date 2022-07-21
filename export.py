@@ -35,12 +35,10 @@ def export_onnx(model, im, file, opset, simplify, end2end):
         onnx.save(model_onnx, f)
 
         # Simplify
-        if simplify and not end2end:
+        if simplify:
             try:
                 print(f'simplifying with onnx-simplifier {onnxsim.__version__}...')
-                model_onnx, check = onnxsim.simplify(model_onnx,
-                                                     dynamic_input_shape=False,
-                                                     input_shapes=None)
+                model_onnx, check = onnxsim.simplify(model_onnx)
                 assert check, 'assert check failed'
                 onnx.save(model_onnx, f)
             except Exception as e:
