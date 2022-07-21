@@ -86,7 +86,7 @@ def run(
             m.export = True
     if end2end:
         model = End2End(model, topk_all, iou_thres, conf_thres, device, with_preprocess=with_preprocess)
-    y, simplify = None, False if end2end else simplify
+    y = None
     for _ in range(2):
         y = model(im)  # dry runs
     shape = tuple(y[0].shape)  # model output shape
