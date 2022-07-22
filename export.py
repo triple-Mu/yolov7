@@ -1,127 +1,117 @@
 import argparse
-import onnx
-import onnxsim
+import sys
+import time
+
+sys.path.append('./')  # to run '$ python *.py' files in subdirectories
+
 import torch
-import warnings
-from pathlib import Path
+import torch.nn as nn
 
-from summary import (file_size, attempt_load, Detect, IDetect, End2End)
+import models
+from models.experimental import attempt_load
+from utils.activations import Hardswish, SiLU
+from utils.general import set_logging, check_img_size
+from utils.torch_utils import select_device
 
-
-def export_onnx(model, im, file, opset, simplify, end2end):
-    # YOLOv5 ONNX export
-    try:
-
-        print(f'\nstarting export with onnx {onnx.__version__}...')
-        f = file.with_suffix('.onnx')
-
-        torch.onnx.export(
-            model,
-            im,
-            f,
-            verbose=False,
-            opset_version=opset,
-            training=torch.onnx.TrainingMode.EVAL,
-            do_constant_folding=True,
-            input_names=['images'],
-            output_names=['num_dets', 'det_boxes', 'det_scores', 'det_classes']
-            if end2end else ['output'],
-            dynamic_axes=None)
-
-        # Checks
-        model_onnx = onnx.load(f)  # load onnx model
-        onnx.checker.check_model(model_onnx)  # check onnx model
-
-        onnx.save(model_onnx, f)
-
-        # Simplify
-        if simplify:
-            try:
-                print(f'simplifying with onnx-simplifier {onnxsim.__version__}...')
-                model_onnx, check = onnxsim.simplify(model_onnx)
-                assert check, 'assert check failed'
-                onnx.save(model_onnx, f)
-            except Exception as e:
-                print(f'simplifier failure: {e}')
-        print(f'export success, saved as {f} ({file_size(f):.1f} MB)')
-        return f
-    except Exception as e:
-        print(f'export failure: {e}')
-
-
-@torch.no_grad()
-def run(
-        weights='yolov7.pt',  # weights path
-        imgsz=(640, 640),  # image (height, width)
-        batch_size=1,  # batch size
-        device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
-        simplify=False,  # ONNX: simplify model
-        opset=12,  # ONNX: opset version
-        end2end=False,  # TRT: add EfficientNMS_TRT to model
-        with_preprocess=False,  # TRT: add preprocess to model (BGR2RGB and divide by 255)
-        topk_all=100,  # TRT: topk for every image to keep
-        iou_thres=0.45,  # TRT: IoU threshold
-        conf_thres=0.25,  # TRT: confidence threshold
-):
-    file = Path(weights)
-    assert file.exists(), f'{file} is not exists'
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--weights', type=str, default='./yolor-csp-c.pt', help='weights path')
+    parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='image size')  # height, width
+    parser.add_argument('--batch-size', type=int, default=1, help='batch size')
+    parser.add_argument('--dynamic', action='store_true', help='dynamic ONNX axes')
+    parser.add_argument('--grid', action='store_true', help='export Detect() layer grid')
+    parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--simplify', action='store_true', help='simplify onnx model')
+    opt = parser.parse_args()
+    opt.img_size *= 2 if len(opt.img_size) == 1 else 1  # expand
+    print(opt)
+    set_logging()
+    t = time.time()
 
     # Load PyTorch model
-    device = torch.device(device)
-    model = attempt_load(weights, device=device, inplace=True, fuse=True)  # load FP32 model
-    nc, names = model.nc, model.names  # number of classes, class names
+    device = select_device(opt.device)
+    model = attempt_load(opt.weights, map_location=device)  # load FP32 model
+    labels = model.names
 
     # Checks
-    imgsz *= 2 if len(imgsz) == 1 else 1  # expand
-    assert nc == len(names), f'Model class count {nc} != len(names) {len(names)}'
+    gs = int(max(model.stride))  # grid size (max stride)
+    opt.img_size = [check_img_size(x, gs) for x in opt.img_size]  # verify img_size are gs-multiples
 
     # Input
-    im = torch.zeros(batch_size, 3, *imgsz).to(device)  # image size(1,3,320,192) BCHW iDetection
+    img = torch.zeros(opt.batch_size, 3, *opt.img_size).to(device)  # image size(1,3,320,192) iDetection
 
-    model.eval()
+    # Update model
     for k, m in model.named_modules():
-        if isinstance(m, (Detect, IDetect)):
-            m.inplace = False
-            m.onnx_dynamic = False
-            m.export = True
-    if end2end:
-        model = End2End(model, topk_all, iou_thres, conf_thres, device, with_preprocess=with_preprocess)
-    y = None
-    for _ in range(2):
-        y = model(im)  # dry runs
-    shape = tuple(y[0].shape)  # model output shape
-    print(f"\nPyTorch: starting from {file} with output shape {shape} ({file_size(file):.1f} MB)")
+        m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatibility
+        if isinstance(m, models.common.Conv):  # assign export-friendly activations
+            if isinstance(m.act, nn.Hardswish):
+                m.act = Hardswish()
+            elif isinstance(m.act, nn.SiLU):
+                m.act = SiLU()
+        # elif isinstance(m, models.yolo.Detect):
+        #     m.forward = m.forward_export  # assign forward (optional)
+    model.model[-1].export = not opt.grid  # set Detect() layer grid export
+    y = model(img)  # dry run
 
-    # Exports
+    # TorchScript export
+    try:
+        print('\nStarting TorchScript export with torch %s...' % torch.__version__)
+        f = opt.weights.replace('.pt', '.torchscript.pt')  # filename
+        ts = torch.jit.trace(model, img, strict=False)
+        ts.save(f)
+        print('TorchScript export success, saved as %s' % f)
+    except Exception as e:
+        print('TorchScript export failure: %s' % e)
 
-    warnings.filterwarnings(action='ignore', category=torch.jit.TracerWarning)  # suppress TracerWarning
-    fstr = export_onnx(model, im, file, opset, simplify, end2end)
+    # ONNX export
+    try:
+        import onnx
 
-    return fstr
+        print('\nStarting ONNX export with onnx %s...' % onnx.__version__)
+        f = opt.weights.replace('.pt', '.onnx')  # filename
+        model.eval()
+        torch.onnx.export(model, img, f, verbose=False, opset_version=12, input_names=['images'],
+                          output_names=['classes', 'boxes'] if y is None else ['output'],
+                          dynamic_axes={'images': {0: 'batch', 2: 'height', 3: 'width'},  # size(1,3,640,640)
+                                        'output': {0: 'batch', 2: 'y', 3: 'x'}} if opt.dynamic else None)
 
+        # Checks
+        onnx_model = onnx.load(f)  # load onnx model
+        onnx.checker.check_model(onnx_model)  # check onnx model
 
-def parse_opt():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='yolov7.pt', help='model.pt path(s)')
-    parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640, 640], help='image (h, w)')
-    parser.add_argument('--batch-size', type=int, default=1, help='batch size')
-    parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--simplify', action='store_true', help='ONNX: simplify model')
-    parser.add_argument('--opset', type=int, default=12, help='ONNX: opset version')
-    parser.add_argument('--end2end', action='store_true', help='TRT: add EfficientNMS_TRT to model')
-    parser.add_argument('--with-preprocess', action='store_true',
-                        help='TRT: add preprocess to model (BGR2RGB and divide by 255)')
-    parser.add_argument('--topk-all', type=int, default=100, help='TRT: topk for every image to keep')
-    parser.add_argument('--iou-thres', type=float, default=0.45, help='TRT: IoU threshold')
-    parser.add_argument('--conf-thres', type=float, default=0.25, help='TRT: confidence threshold')
-    opt = parser.parse_args()
-    return opt
+        # # Metadata
+        # d = {'stride': int(max(model.stride))}
+        # for k, v in d.items():
+        #     meta = onnx_model.metadata_props.add()
+        #     meta.key, meta.value = k, str(v)
+        # onnx.save(onnx_model, f)
 
+        if opt.simplify:
+            try:
+                import onnxsim
 
-def main(opt):
-    run(**vars(opt))
+                print('\nStarting to simplify ONNX...')
+                onnx_model, check = onnxsim.simplify(onnx_model)
+                assert check, 'assert check failed'
+            except Exception as e:
+                print(f'Simplifier failure: {e}')
+        # print(onnx.helper.printable_graph(onnx_model.graph))  # print a human readable model
+        print('ONNX export success, saved as %s' % f)
+    except Exception as e:
+        print('ONNX export failure: %s' % e)
 
+    # CoreML export
+    try:
+        import coremltools as ct
 
-if __name__ == "__main__":
-    opt = parse_opt()
-    main(opt)
+        print('\nStarting CoreML export with coremltools %s...' % ct.__version__)
+        # convert model from torchscript and apply pixel scaling as per detect.py
+        model = ct.convert(ts, inputs=[ct.ImageType(name='image', shape=img.shape, scale=1 / 255.0, bias=[0, 0, 0])])
+        f = opt.weights.replace('.pt', '.mlmodel')  # filename
+        model.save(f)
+        print('CoreML export success, saved as %s' % f)
+    except Exception as e:
+        print('CoreML export failure: %s' % e)
+
+    # Finish
+    print('\nExport complete (%.2fs). Visualize with https://github.com/lutzroeder/netron.' % (time.time() - t))
