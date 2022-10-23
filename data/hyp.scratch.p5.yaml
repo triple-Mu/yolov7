@@ -29,3 +29,14 @@ mixup: 0.15  # image mixup (probability)
 copy_paste: 0.0  # image copy paste (probability)
 paste_in: 0.15  # image copy paste (probability), use 0 for faster training
 loss_ota: 1 # use ComputeLossOTA, use 0 for faster training
+
+# ########################################################################
+# CLASS BALANCE
+# repeat_thr=0.1
+# no_repeat=True
+# repeat_no_moscia=True
+#########################################################################
+class_balance: true
+repeat_thr: 0.1
+no_repeat: true
+repeat_no_moscia: true

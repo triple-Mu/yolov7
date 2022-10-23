@@ -1,0 +1,14 @@
+
+
+# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+path: /media/ubuntu/Others/datasets/天池/20221012/training_set/train/coco_tianchi/orin_yolov5/nosplit  # dataset root dir
+train: /media/ubuntu/Others/datasets/天池/20221012/training_set/train/coco_tianchi/orin_yolov5/nosplit/train  # train images (relative to 'path') 128 images
+val: /media/ubuntu/Others/datasets/天池/20221012/training_set/train/coco_tianchi/orin_yolov5/nosplit/train  # val images (relative to 'path') 128 images
+test:  /media/ubuntu/Others/datasets/天池/20221012/training_set/train/coco_tianchi/orin_yolov5/nosplit/train # test images (optional)
+
+# Classes
+nc: 8
+names: ['Bacillariophyta', 'Chlorella', 'Chrysophyta', 'Dunaliella_salina',
+        'Platymonas', 'translating_Symbiodinium', 'bleaching_Symbiodinium',
+        'normal_Symbiodinium']
+
