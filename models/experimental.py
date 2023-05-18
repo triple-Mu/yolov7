@@ -250,6 +250,9 @@ def attempt_load(weights, map_location=None):
     for w in weights if isinstance(weights, list) else [weights]:
         attempt_download(w)
         ckpt = torch.load(w, map_location=map_location)  # load
+        state_dict = ckpt['model'].state_dict()
+        state_dict = {k: v for k, v in state_dict.items() if int(k.split('.')[1]) < 112}
+        ckpt['model'].load_state_dict(state_dict, strict=False)
         model.append(ckpt['ema' if ckpt.get('ema') else 'model'].float().fuse().eval())  # FP32 model
     
     # Compatibility updates
