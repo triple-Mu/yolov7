@@ -1327,7 +1327,7 @@ class ComputeLossAuxOTA:
                 all_gj.append(gj)
                 all_gi.append(gi)
                 all_anch.append(anch[i][idx])
-                from_which_layer.append(torch.ones(size=(len(b),)) * i)
+                from_which_layer.append(b.new_ones(size=(len(b),)) * i)
                 
                 fg_pred = pi[b, a, gj, gi]                
                 p_obj.append(fg_pred[:, 4:5])
@@ -1447,7 +1447,7 @@ class ComputeLossAuxOTA:
         matching_gis = [[] for pp in p]
         matching_targets = [[] for pp in p]
         matching_anchs = [[] for pp in p]
-        
+        # device = targets.device
         nl = len(p)    
     
         for batch_idx in range(p[0].shape[0]):
@@ -1480,7 +1480,7 @@ class ComputeLossAuxOTA:
                 all_gj.append(gj)
                 all_gi.append(gi)
                 all_anch.append(anch[i][idx])
-                from_which_layer.append(torch.ones(size=(len(b),)) * i)
+                from_which_layer.append(b.new_ones(size=(len(b),)) * i)
                 
                 fg_pred = pi[b, a, gj, gi]                
                 p_obj.append(fg_pred[:, 4:5])
